@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>10×10 围棋</title>
+  <style>
+    :root {
+      --board-size: min(92vw, 92vh, 520px);
+      --line-color: #3f2b1b;
+      --wood: #d8a760;
+      --text: #1d1d1d;
+      --panel: #fff8ea;
+      --accent: #2c7be5;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(180deg, #f5e3c2 0%, #e8c48b 100%);
+      color: var(--text);
+      padding: 12px;
+    }
+
+    .app {
+      width: min(96vw, 620px);
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+      display: grid;
+      gap: 12px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(20px, 3.8vw, 28px);
+      text-align: center;
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: #f1e1c8;
+      font-weight: 600;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,.4);
+    }
+
+    .black { background: #121212; }
+    .white { background: #fefefe; }
+
+    .board-wrap {
+      width: 100%;
+      display: grid;
+      place-items: center;
+    }
+
+    canvas {
+      width: var(--board-size);
+      height: var(--board-size);
+      background: var(--wood);
+      border-radius: 8px;
+      touch-action: manipulation;
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.18);
+      display: block;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 10px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 2px 6px rgba(0,0,0,.18);
+      cursor: pointer;
+    }
+
+    button:active { transform: translateY(1px); }
+
+    .hint {
+      margin: 0;
+      font-size: 13px;
+      color: #543f26;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1 class="title">10×10 围棋</h1>
+
+    <div class="status">
+      <span id="turnBadge" class="badge">
+        <span class="dot black"></span>
+        黑棋回合
+      </span>
+      <span class="badge">黑提子：<strong id="blackCapture">0</strong></span>
+      <span class="badge">白提子：<strong id="whiteCapture">0</strong></span>
+    </div>
+
+    <div class="board-wrap">
+      <canvas id="board" width="720" height="720" aria-label="围棋棋盘"></canvas>
+    </div>
+
+    <div class="controls">
+      <button id="passBtn" type="button">停一手</button>
+      <button id="undoBtn" type="button">悔棋</button>
+      <button id="resetBtn" type="button">重新开始</button>
+    </div>
+
+    <p id="message" class="hint">规则：落子后无气会被提走；不允许自杀手。连续双方都停一手则结束（按提子数判胜）。</p>
+  </main>
+
+  <script>
+    const SIZE = 10;
+    const EMPTY = 0, BLACK = 1, WHITE = 2;
+    const board = Array.from({ length: SIZE }, () => Array(SIZE).fill(EMPTY));
+
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    const turnBadge = document.getElementById('turnBadge');
+    const blackCaptureEl = document.getElementById('blackCapture');
+    const whiteCaptureEl = document.getElementById('whiteCapture');
+    const messageEl = document.getElementById('message');
+    const passBtn = document.getElementById('passBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let current = BLACK;
+    let blackCapture = 0;
+    let whiteCapture = 0;
+    let passStreak = 0;
+    let history = [];
+    let gameOver = false;
+
+    function cloneBoard(src) {
+      return src.map(row => [...row]);
+    }
+
+    function snapshot() {
+      history.push({
+        board: cloneBoard(board),
+        current,
+        blackCapture,
+        whiteCapture,
+        passStreak,
+        gameOver
+      });
+      if (history.length > 300) history.shift();
+    }
+
+    function restore(state) {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          board[y][x] = state.board[y][x];
+        }
+      }
+      current = state.current;
+      blackCapture = state.blackCapture;
+      whiteCapture = state.whiteCapture;
+      passStreak = state.passStreak;
+      gameOver = state.gameOver;
+      refreshUI();
+      draw();
+    }
+
+    function neighbors(x, y) {
+      return [
+        [x + 1, y],
+        [x - 1, y],
+        [x, y + 1],
+        [x, y - 1],
+      ].filter(([nx, ny]) => nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE);
+    }
+
+    function collectGroup(x, y, color) {
+      const stack = [[x, y]];
+      const visited = new Set([`${x},${y}`]);
+      const stones = [];
+      let liberties = 0;
+
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        stones.push([cx, cy]);
+
+        for (const [nx, ny] of neighbors(cx, cy)) {
+          if (board[ny][nx] === EMPTY) {
+            liberties++;
+            continue;
+          }
+          if (board[ny][nx] !== color) continue;
+          const key = `${nx},${ny}`;
+          if (!visited.has(key)) {
+            visited.add(key);
+            stack.push([nx, ny]);
+          }
+        }
+      }
+
+      return { stones, liberties };
+    }
+
+    function removeGroup(group) {
+      for (const [x, y] of group.stones) {
+        board[y][x] = EMPTY;
+      }
+      return group.stones.length;
+    }
+
+    function play(x, y) {
+      if (gameOver) {
+        setMessage('对局已结束，请点击“重新开始”。');
+        return;
+      }
+      if (board[y][x] !== EMPTY) {
+        setMessage('该位置已有棋子。');
+        return;
+      }
+
+      snapshot();
+      passStreak = 0;
+      board[y][x] = current;
+      const enemy = current === BLACK ? WHITE : BLACK;
+
+      let captured = 0;
+      const handled = new Set();
+
+      for (const [nx, ny] of neighbors(x, y)) {
+        if (board[ny][nx] !== enemy) continue;
+        const key = `${nx},${ny}`;
+        if (handled.has(key)) continue;
+
+        const group = collectGroup(nx, ny, enemy);
+        for (const [gx, gy] of group.stones) handled.add(`${gx},${gy}`);
+
+        if (group.liberties === 0) {
+          captured += removeGroup(group);
+        }
+      }
+
+      const myGroup = collectGroup(x, y, current);
+      if (myGroup.liberties === 0) {
+        const last = history.pop();
+        restore(last);
+        setMessage('不允许自杀手。');
+        return;
+      }
+
+      if (captured > 0) {
+        if (current === BLACK) blackCapture += captured;
+        else whiteCapture += captured;
+      }
+
+      current = enemy;
+      setMessage(captured > 0 ? `提走 ${captured} 子。` : '已落子。');
+      refreshUI();
+      draw();
+    }
+
+    function passTurn() {
+      if (gameOver) return;
+      snapshot();
+      passStreak += 1;
+      current = current === BLACK ? WHITE : BLACK;
+
+      if (passStreak >= 2) {
+        gameOver = true;
+        const winner = blackCapture === whiteCapture
+          ? '平局'
+          : (blackCapture > whiteCapture ? '黑棋胜' : '白棋胜');
+        setMessage(`双方连续停一手，对局结束：${winner}（黑提子 ${blackCapture}，白提子 ${whiteCapture}）`);
+      } else {
+        setMessage('停一手。');
+      }
+      refreshUI();
+      draw();
+    }
+
+    function undo() {
+      const prev = history.pop();
+      if (!prev) {
+        setMessage('没有可悔的棋。');
+        return;
+      }
+      restore(prev);
+      setMessage('已悔棋。');
+    }
+
+    function resetGame() {
+      for (let y = 0; y < SIZE; y++) board[y].fill(EMPTY);
+      current = BLACK;
+      blackCapture = 0;
+      whiteCapture = 0;
+      passStreak = 0;
+      gameOver = false;
+      history = [];
+      setMessage('新对局开始，黑棋先行。');
+      refreshUI();
+      draw();
+    }
+
+    function setMessage(msg) {
+      messageEl.textContent = msg;
+    }
+
+    function refreshUI() {
+      blackCaptureEl.textContent = blackCapture;
+      whiteCaptureEl.textContent = whiteCapture;
+
+      const isBlack = current === BLACK;
+      turnBadge.innerHTML = `<span class="dot ${isBlack ? 'black' : 'white'}"></span>${isBlack ? '黑棋回合' : '白棋回合'}`;
+      turnBadge.style.background = isBlack ? '#f1e1c8' : '#f2f2f2';
+      turnBadge.style.color = '#1d1d1d';
+    }
+
+    function drawBoardLines() {
+      const pad = 50;
+      const cell = (canvas.width - pad * 2) / (SIZE - 1);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(40, 28, 18, .75)';
+
+      for (let i = 0; i < SIZE; i++) {
+        const pos = pad + i * cell;
+        ctx.beginPath();
+        ctx.moveTo(pad, pos);
+        ctx.lineTo(canvas.width - pad, pos);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(pos, pad);
+        ctx.lineTo(pos, canvas.height - pad);
+        ctx.stroke();
+      }
+
+      const stars = [2, 5, 7];
+      for (const sy of stars) {
+        for (const sx of stars) {
+          ctx.beginPath();
+          ctx.fillStyle = '#2f2012';
+          ctx.arc(pad + sx * cell, pad + sy * cell, 5.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    function drawStones() {
+      const pad = 50;
+      const cell = (canvas.width - pad * 2) / (SIZE - 1);
+
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const v = board[y][x];
+          if (v === EMPTY) continue;
+
+          const cx = pad + x * cell;
+          const cy = pad + y * cell;
+          const r = cell * 0.42;
+
+          const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.2, cx, cy, r);
+          if (v === BLACK) {
+            grad.addColorStop(0, '#555');
+            grad.addColorStop(1, '#0e0e0e');
+          } else {
+            grad.addColorStop(0, '#fff');
+            grad.addColorStop(1, '#d9d9d9');
+          }
+
+          ctx.beginPath();
+          ctx.fillStyle = grad;
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(0, 0, 0, .25)';
+          ctx.stroke();
+        }
+      }
+    }
+
+    function draw() {
+      drawBoardLines();
+      drawStones();
+    }
+
+    function canvasToGrid(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const realX = x * scaleX;
+      const realY = y * scaleY;
+
+      const pad = 50;
+      const cell = (canvas.width - pad * 2) / (SIZE - 1);
+      const gx = Math.round((realX - pad) / cell);
+      const gy = Math.round((realY - pad) / cell);
+
+      if (gx < 0 || gx >= SIZE || gy < 0 || gy >= SIZE) return null;
+      return [gx, gy];
+    }
+
+    canvas.addEventListener('click', (e) => {
+      const pos = canvasToGrid(e.clientX, e.clientY);
+      if (!pos) return;
+      play(pos[0], pos[1]);
+    });
+
+    passBtn.addEventListener('click', passTurn);
+    undoBtn.addEventListener('click', undo);
+    resetBtn.addEventListener('click', resetGame);
+
+    resetGame();
+  </script>
+</body>
+</html>
