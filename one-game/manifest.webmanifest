@@ -1,0 +1,22 @@
+{
+  "name": "一号游戏",
+  "short_name": "一号游戏",
+  "description": "可安装的本地卡牌游戏启动器",
+  "lang": "zh-CN",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "orientation": "any",
+  "background_color": "#05070d",
+  "theme_color": "#070b13",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
