@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="一号游戏">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#070b13">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <title>一号游戏</title>
+  <style>
+    :root{color-scheme:dark;--bg:#05070d;--panel:#111827;--line:#33415f;--gold:#e8c16a;--text:#f6f0df;--muted:#aeb8cf}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:var(--text);overscroll-behavior:none}
+    body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    #stage{position:fixed;inset:0;background:radial-gradient(circle at 50% 0,#1d2a4a 0,#090d18 42%,#05070d 100%)}
+    #gameFrame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#05070d;display:none}
+    .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:22px;z-index:20;background:radial-gradient(circle at 50% 12%,rgba(80,115,184,.26),transparent 38%),linear-gradient(180deg,#080d18,#05070d)}
+    .panel{width:min(440px,100%);padding:24px;border:1px solid rgba(232,193,106,.32);border-radius:22px;background:linear-gradient(180deg,rgba(25,34,53,.97),rgba(8,12,21,.98));box-shadow:0 24px 70px rgba(0,0,0,.55);text-align:center}
+    h1{margin:0 0 5px;font-family:"Songti SC","STSong",serif;font-size:30px;letter-spacing:5px;color:#f6dda1}
+    .version{font-size:12px;color:var(--muted);margin-bottom:18px}
+    p{margin:10px 0;color:#cbd5e8;font-size:14px;line-height:1.55}
+    .small{font-size:12px;color:var(--muted)}
+    button,.file-label{display:flex;width:100%;min-height:48px;align-items:center;justify-content:center;margin-top:10px;padding:10px 14px;border:1px solid rgba(232,193,106,.42);border-radius:13px;background:linear-gradient(180deg,#293a59,#142036);color:#fff4d2;font-size:15px;font-weight:800;box-shadow:0 8px 18px rgba(0,0,0,.3);cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#d19b38,#77470d);border-color:#f4d88c}
+    button.danger{background:linear-gradient(180deg,#6b2b35,#35131a);border-color:rgba(255,111,117,.42)}
+    button:active,.file-label:active{transform:translateY(1px);filter:brightness(.94)}
+    input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+    #fileName{margin-top:10px;min-height:18px;font-size:12px;color:#8fd6aa;word-break:break-all}
+    #toolsBtn{position:fixed;top:calc(8px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));z-index:10002;width:38px;min-height:38px;margin:0;padding:0;border-radius:50%;opacity:.38;display:none}
+    #toolsBtn:active,#toolsBtn.open{opacity:1}
+    #tools{position:fixed;top:calc(52px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));z-index:10001;width:205px;padding:10px;border:1px solid var(--line);border-radius:15px;background:rgba(8,12,21,.96);box-shadow:0 16px 42px rgba(0,0,0,.55);display:none;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+    #tools.show{display:block}
+    #tools button{min-height:40px;margin:6px 0 0;font-size:13px;box-shadow:none}
+    #toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);z-index:11000;max-width:90%;padding:8px 12px;border-radius:999px;background:rgba(0,0,0,.8);font-size:12px;opacity:0;pointer-events:none;transition:.2s}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(4px)}
+    .hidden{display:none!important}
+    @media (orientation:landscape){.panel{width:min(520px,86vw);padding:18px 22px}h1{font-size:26px}.screen{padding:12px}}
+  </style>
+</head>
+<body>
+<div id="stage">
+  <iframe id="gameFrame" title="一号游戏" allow="fullscreen; screen-wake-lock" referrerpolicy="no-referrer"></iframe>
+
+  <section id="setup" class="screen">
+    <div class="panel">
+      <h1>一号游戏</h1>
+      <div class="version">全屏主屏幕版 · 本地安全存储</div>
+      <p>首次使用请选择下载好的游戏 HTML。文件只保存在这台手机的浏览器本地，不会上传到服务器。</p>
+      <label class="file-label" for="gameFile">选择游戏 HTML</label>
+      <input id="gameFile" type="file" accept="text/html,.html,.htm">
+      <div id="fileName"></div>
+      <button id="importBtn" class="primary" disabled>导入并启动</button>
+      <p class="small">建议使用 Safari 打开本页，点击“分享 → 添加到主屏幕”，再从桌面图标启动。</p>
+    </div>
+  </section>
+
+  <section id="launch" class="screen hidden">
+    <div class="panel">
+      <h1>一号游戏</h1>
+      <div id="storedName" class="version"></div>
+      <p>点击后进入游戏，并尝试保持屏幕常亮。</p>
+      <button id="launchBtn" class="primary">进入游戏</button>
+      <button id="replaceBtn">更换游戏文件</button>
+      <p class="small">需要锁定在游戏内：开启 iPhone“引导式访问”，启动后连按三次侧边按钮。</p>
+    </div>
+  </section>
+</div>
+
+<button id="toolsBtn" aria-label="游戏工具">☰</button>
+<div id="tools">
+  <div class="small">游戏工具</div>
+  <button id="wakeBtn">保持屏幕常亮</button>
+  <button id="reloadBtn">重新载入游戏</button>
+  <button id="changeBtn">更换游戏文件</button>
+  <button id="clearBtn" class="danger">清除本地游戏</button>
+</div>
+<div id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+  const DB_NAME='one-game-pwa';
+  const STORE='files';
+  const KEY='current-game';
+  const setup=document.getElementById('setup');
+  const launch=document.getElementById('launch');
+  const frame=document.getElementById('gameFrame');
+  const fileInput=document.getElementById('gameFile');
+  const importBtn=document.getElementById('importBtn');
+  const fileName=document.getElementById('fileName');
+  const storedName=document.getElementById('storedName');
+  const toolsBtn=document.getElementById('toolsBtn');
+  const tools=document.getElementById('tools');
+  let selectedFile=null;
+  let currentRecord=null;
+  let wakeLock=null;
+
+  function toast(text){
+    const el=document.getElementById('toast');
+    el.textContent=text;el.classList.add('show');
+    clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2200);
+  }
+
+  function openDB(){
+    return new Promise((resolve,reject)=>{
+      const req=indexedDB.open(DB_NAME,1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))req.result.createObjectStore(STORE)};
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+  async function dbGet(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction(STORE,'readonly').objectStore(STORE).get(KEY);
+      req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);
+    });
+  }
+  async function dbPut(value){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(value,KEY);
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+    });
+  }
+  async function dbDelete(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+    });
+  }
+
+  async function requestWakeLock(){
+    if(!('wakeLock' in navigator)){toast('此浏览器不支持网页常亮');return false}
+    try{
+      wakeLock=await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release',()=>{wakeLock=null},{once:true});
+      toast('屏幕常亮已开启');return true;
+    }catch(_){toast('常亮请求被浏览器拒绝');return false}
+  }
+
+  function showSetup(){
+    frame.style.display='none';toolsBtn.style.display='none';tools.classList.remove('show');
+    launch.classList.add('hidden');setup.classList.remove('hidden');
+  }
+  function showLaunch(record){
+    currentRecord=record;storedName.textContent=record.name||'已导入游戏';
+    setup.classList.add('hidden');launch.classList.remove('hidden');
+  }
+  async function startGame(){
+    if(!currentRecord)return showSetup();
+    await requestWakeLock();
+    frame.srcdoc=currentRecord.html;
+    frame.style.display='block';setup.classList.add('hidden');launch.classList.add('hidden');
+    toolsBtn.style.display='flex';
+  }
+
+  fileInput.addEventListener('change',()=>{
+    selectedFile=fileInput.files&&fileInput.files[0]||null;
+    fileName.textContent=selectedFile?selectedFile.name:'';
+    importBtn.disabled=!selectedFile;
+  });
+
+  importBtn.addEventListener('click',async()=>{
+    if(!selectedFile)return;
+    try{
+      const html=await selectedFile.text();
+      if(!/<html[\s>]/i.test(html)||!/<script[\s>]/i.test(html))throw new Error('invalid');
+      currentRecord={name:selectedFile.name,html,updatedAt:Date.now()};
+      await dbPut(currentRecord);toast('游戏已保存在本机');await startGame();
+    }catch(_){toast('无法读取这个HTML文件')}
+  });
+
+  document.getElementById('launchBtn').addEventListener('click',startGame);
+  document.getElementById('replaceBtn').addEventListener('click',showSetup);
+  document.getElementById('changeBtn').addEventListener('click',showSetup);
+  document.getElementById('wakeBtn').addEventListener('click',requestWakeLock);
+  document.getElementById('reloadBtn').addEventListener('click',()=>{if(currentRecord){frame.srcdoc='';setTimeout(()=>frame.srcdoc=currentRecord.html,30);tools.classList.remove('show')}});
+  document.getElementById('clearBtn').addEventListener('click',async()=>{await dbDelete();currentRecord=null;frame.srcdoc='';showSetup();toast('本地游戏已清除')});
+  toolsBtn.addEventListener('click',()=>{tools.classList.toggle('show');toolsBtn.classList.toggle('open')});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&frame.style.display==='block')requestWakeLock()});
+
+  if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}),{once:true});
+
+  dbGet().then(record=>record?showLaunch(record):showSetup()).catch(showSetup);
+})();
+</script>
+</body>
+</html>
